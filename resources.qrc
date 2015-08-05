@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>sound/codeccall.wav</file>
+    </qresource>
+</RCC>
