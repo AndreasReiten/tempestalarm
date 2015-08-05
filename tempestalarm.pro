@@ -15,6 +15,11 @@ win32 {
 TARGET = TempestAlarm
 TEMPLATE = app
 
+OBJECTS_DIR = .obj
+MOC_DIR = .moc
+RCC_DIR = .rcc
+UI_DIR = .ui
+
 include(deps/zlib/zlib.pri)
 
 

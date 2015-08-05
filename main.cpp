@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
 
     QCoreApplication::setOrganizationName("Natnux");
     QCoreApplication::setApplicationVersion("0.1");
-    QCoreApplication::setApplicationName("Tempest Alarm");
+    QCoreApplication::setApplicationName("TempestAlarm");
 
     MainWindow main_window;
     main_window.setWindowTitle(QString(QCoreApplication::applicationName()+" (v "+QCoreApplication::applicationVersion()+")"));
