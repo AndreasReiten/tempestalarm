@@ -51,6 +51,7 @@ public slots:
     void mapTableDoubleClicked(const QModelIndex &index);
     void tabChanged(int index);
     void setVolume(int value);
+    void setMinVotes(int value);
 
 private:
     Ui::MainWindow *ui;
@@ -87,6 +88,7 @@ private:
     int high_map_level;
     int alarm_value_threshold;
     int alarm_wait_time;
+    int min_votes;
 
     QSettings settings;
 };

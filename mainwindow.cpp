@@ -22,15 +22,18 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
+    QThreadPool::globalInstance()->clear();
+
     settings.setValue("main_window/geometry", saveGeometry());
     settings.setValue("low_map_level", ui->lowMapSpinBox->value());
     settings.setValue("high_map_level", ui->highMapSpinBox->value());
     settings.setValue("affix_value_alarm_threshold", ui->alarmThresholdSpinBox->value());
     settings.setValue("alarm_confirmation_time", ui->alarmWaitSpinBox->value());
     settings.setValue("alarm_volume", ui->volumeSlider->value());
+    settings.setValue("min_votes", ui->minVoteSpinBox->value());
 
-    if (map_db.isOpen()) map_db.close();
-    if (tempest_affix_db.isOpen()) tempest_affix_db.close();
+//    if (map_db.isOpen()) map_db.close();
+//    if (tempest_affix_db.isOpen()) tempest_affix_db.close();
     delete ui;
 }
 
@@ -105,28 +108,6 @@ void MainWindow::initDataBases()
             qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
         }
 
-//        query.prepare("INSERT OR REPLACE INTO Prefix (Name, Value, Description) "
-//                      "VALUES (:Name,:Value,:Description);");
-//        query.bindValue(":Name", "Corrupting Tempest");
-//        query.bindValue(":Value", 100);
-//        query.bindValue(":Description", "Corrupted drops.");
-
-//        if (!query.exec())
-//        {
-//            qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
-//        }
-
-//        query.prepare("INSERT OR REPLACE INTO Prefix (Name, Value, Description) "
-//                      "VALUES (:Name,:Value,:Description);");
-//        query.bindValue(":Name", "Shining Tempest");
-//        query.bindValue(":Value", 100);
-//        query.bindValue(":Description", "Loots!");
-
-//        if (!query.exec())
-//        {
-//            qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
-//        }
-
         if (!query.exec("CREATE TABLE IF NOT EXISTS Suffix ("
                         "Name TEXT PRIMARY KEY NOT NULL, "
                         "Value INT,"
@@ -134,26 +115,6 @@ void MainWindow::initDataBases()
         {
             qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
         }
-
-//        query.prepare("INSERT OR REPLACE INTO Suffix (Name, Value, Description) "
-//                      "VALUES (:Name,:Value,:Description);");
-//        query.bindValue(":Name", "Turmoil");
-//        query.bindValue(":Value", 100);
-//        query.bindValue(":Description", "Area is inhabited by 20 additional Rogue Exiles");
-//        if (!query.exec())
-//        {
-//            qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
-//        }
-
-//        query.prepare("INSERT OR REPLACE INTO Suffix (Name, Value, Description) "
-//                      "VALUES (:Name,:Value,:Description);");
-//        query.bindValue(":Name", "Phantoms");
-//        query.bindValue(":Value", 100);
-//        query.bindValue(":Description", "Area is haunted by 10 additional Tormented Spirits");
-//        if (!query.exec())
-//        {
-//            qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
-//        }
     }
     else
     {
@@ -175,6 +136,7 @@ void MainWindow::initialize()
     ui->alarmThresholdSpinBox->setValue(settings.value("affix_value_alarm_threshold",50).toInt());
     ui->alarmWaitSpinBox->setValue(settings.value("alarm_confirmation_time",180).toInt());
     ui->volumeSlider->setValue(settings.value("alarm_volume",50).toInt());
+    ui->minVoteSpinBox->setValue(settings.value("min_votes",3).toInt());
 
     // Set alarm audio file
     alarm_effect.setSource(QUrl::fromLocalFile("sound/codeccall.wav"));
@@ -293,6 +255,9 @@ void MainWindow::initialize()
     connect(resolve_maps_timer, SIGNAL(timeout()), this, SLOT(resolveMapTempests()));
     resolve_maps_timer->start(500);
 
+    // Init min vote spin box
+    connect(ui->minVoteSpinBox, SIGNAL(valueChanged(int)), this, SLOT(setMinVotes(int)));
+
     pullMaps();
 }
 
@@ -326,6 +291,11 @@ void MainWindow::mapTableDoubleClicked(const QModelIndex & index)
         // Do something on double click
 //        index.data().toString();
     }
+}
+
+void MainWindow::setMinVotes(int value)
+{
+    min_votes = value;
 }
 
 void MainWindow::setLowMapLevel(int value)
@@ -390,10 +360,11 @@ void MainWindow::resolveMapTempests()
     }
 
     QSqlQuery query(map_db);
-    query.prepare("SELECT * FROM Maps WHERE TempestValue >=:Threshold AND Level >= :LowMapLevel AND Level <= :HighMapLevel;");
+    query.prepare("SELECT * FROM Maps WHERE TempestValue >=:Threshold AND Level >= :LowMapLevel AND Level <= :HighMapLevel AND Votes >= :MinVotes;");
     query.bindValue(":Threshold", alarm_value_threshold);
     query.bindValue(":LowMapLevel", low_map_level);
     query.bindValue(":HighMapLevel", high_map_level);
+    query.bindValue(":MinVotes", min_votes);
     if (!query.exec())
     {
         qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
@@ -457,7 +428,9 @@ void MainWindow::onReplyFinished(QNetworkReply * reply)
         qDebug() << "Network request status code "+QString::number(int(reply->error()))+" ("+reply->url().toString()+"): "+reply->errorString();
     }
 
-    ParseReplyTask *task = new ParseReplyTask(&map_db, &tempest_affix_db, reply);
+    ParseReplyTask *task = new ParseReplyTask(map_db, tempest_affix_db, reply);
+    task->setAutoDelete(true);
+
     connect(task, SIGNAL(mapDataChanged()), this, SLOT(updateMapTable()));
     connect(task, SIGNAL(tempestPrefixDataChanged()), this, SLOT(updatePrefixTable()));
     connect(task, SIGNAL(tempestSuffixDataChanged()), this, SLOT(updateSuffixTable()));

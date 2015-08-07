@@ -5,7 +5,7 @@
 #include <QRegularExpressionMatch>
 #include <QSqlError>
 
-ParseReplyTask::ParseReplyTask(QSqlDatabase * map_db, QSqlDatabase *tempest_db, QNetworkReply * reply)
+ParseReplyTask::ParseReplyTask(QSqlDatabase map_db, QSqlDatabase tempest_db, QNetworkReply *reply)
 {
     p_map_db = map_db;
     p_tempest_affix_db = tempest_db;
@@ -62,7 +62,7 @@ void ParseReplyTask::run()
                     int suffix_value;
 
 
-                    QSqlQuery query(*p_tempest_affix_db);
+                    QSqlQuery query(p_tempest_affix_db);
                     query.prepare("SELECT Value FROM Prefix WHERE Name=:Name;");
                     query.bindValue(":Name", tempest_prefix);
                     if (!query.exec())
@@ -112,7 +112,7 @@ void ParseReplyTask::run()
 
 void ParseReplyTask::upsertMap(QString map, int level, QString tempest_prefix, QString tempest_suffix, int tempest_value, int votes)
 {
-    QSqlQuery query(*p_map_db);
+    QSqlQuery query(p_map_db);
     query.prepare("INSERT OR REPLACE INTO Maps (Name, Level, TempestPrefix, TempestSuffix, TempestValue, Votes) "
                   "VALUES (:Name,:Level,:TempestPrefix,:TempestSuffix,:TempestValue,:Votes);");
     query.bindValue(":Name", map);
@@ -132,7 +132,7 @@ void ParseReplyTask::upsertMap(QString map, int level, QString tempest_prefix, Q
 
 void ParseReplyTask::upsertPrefix(QString prefix, QString description)
 {
-    QSqlQuery query(*p_tempest_affix_db);
+    QSqlQuery query(p_tempest_affix_db);
     query.prepare("INSERT OR IGNORE INTO Prefix (Name, Value, Description) "
                   "VALUES (:Name,(SELECT Value FROM Prefix WHERE Name=:Name),:Description);");
     query.bindValue(":Name", prefix);
@@ -148,7 +148,7 @@ void ParseReplyTask::upsertPrefix(QString prefix, QString description)
 
 void ParseReplyTask::upsertSuffix(QString suffix, QString description)
 {
-    QSqlQuery query(*p_tempest_affix_db);
+    QSqlQuery query(p_tempest_affix_db);
     query.prepare("INSERT OR IGNORE INTO Suffix (Name, Value, Description) "
                   "VALUES (:Name,(SELECT Value FROM Suffix WHERE Name=:Name),:Description);");
     query.bindValue(":Name", suffix);
