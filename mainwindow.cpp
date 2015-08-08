@@ -9,6 +9,8 @@
 #include <QDebug>
 #include <QPalette>
 
+#include "sqlqol.h"
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -83,7 +85,7 @@ void MainWindow::initDataBases()
                         "TempestValue INT, "
                         "Votes INT);"))
         {
-            qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
+            qDebug() << sqlQueryError(query);
         }
     }
     else
@@ -105,7 +107,7 @@ void MainWindow::initDataBases()
                         "Value INT,"
                         "Description TEXT);"))
         {
-            qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
+            qDebug() << sqlQueryError(query);
         }
 
         if (!query.exec("CREATE TABLE IF NOT EXISTS Suffix ("
@@ -113,7 +115,7 @@ void MainWindow::initDataBases()
                         "Value INT,"
                         "Description TEXT);"))
         {
-            qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
+            qDebug() << sqlQueryError(query);
         }
     }
     else
@@ -367,7 +369,7 @@ void MainWindow::resolveMapTempests()
     query.bindValue(":MinVotes", min_votes);
     if (!query.exec())
     {
-        qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
+        qDebug() << sqlQueryError(query);
     }
 
     if (query.next())

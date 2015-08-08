@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui sql webenginewidgets multimedia
+QT       += core gui sql multimedia webenginewidgets
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets network
 
@@ -34,7 +34,8 @@ HEADERS  += mainwindow.h \
     guncompress.h \
     restrictivesqltablemodel.h \
     customsqlquerymodel.h \
-    parsereplytask.h
+    parsereplytask.h \
+    sqlqol.h
 
 FORMS    += mainwindow.ui
 

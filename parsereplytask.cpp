@@ -4,12 +4,25 @@
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 #include <QSqlError>
+#include "sqlqol.h"
 
 ParseReplyTask::ParseReplyTask(QSqlDatabase map_db, QSqlDatabase tempest_db, QNetworkReply *reply)
 {
     p_map_db = map_db;
     p_tempest_affix_db = tempest_db;
     p_reply = reply;
+
+    qFindPrefix = new QSqlQuery(p_tempest_affix_db);
+    qFindSuffix = new QSqlQuery(p_tempest_affix_db);
+    qInsertMap = new QSqlQuery(p_map_db);
+    qInsertPrefix = new QSqlQuery(p_tempest_affix_db);
+    qInsertSuffix = new QSqlQuery(p_tempest_affix_db);
+
+    qFindPrefix->prepare("SELECT Value FROM Prefix WHERE Name=:Name;");
+    qFindSuffix->prepare("SELECT Value FROM Suffix WHERE Name=:Name;");
+    qInsertMap->prepare("INSERT OR REPLACE INTO Maps (Name, Level, TempestPrefix, TempestSuffix, TempestValue, Votes) VALUES (:Name,:Level,:TempestPrefix,:TempestSuffix,:TempestValue,:Votes);");
+    qInsertPrefix->prepare("INSERT OR IGNORE INTO Prefix (Name, Value, Description) VALUES (:Name,(SELECT Value FROM Prefix WHERE Name=:Name),:Description);");
+    qInsertSuffix->prepare("INSERT OR IGNORE INTO Suffix (Name, Value, Description) VALUES (:Name,(SELECT Value FROM Suffix WHERE Name=:Name),:Description);");
 }
 
 void ParseReplyTask::run()
@@ -36,6 +49,10 @@ void ParseReplyTask::run()
 
     int rx_index = 0;
 
+    // Enable transaction
+    p_map_db.transaction();
+    p_tempest_affix_db.transaction();
+
     while (rx_index >= 0)
     {
         QRegularExpressionMatch rx_map_match = rx_map.match(str,rx_index);
@@ -61,36 +78,24 @@ void ParseReplyTask::run()
                     int prefix_value;
                     int suffix_value;
 
+                    qFindPrefix->bindValue(":Name", tempest_prefix);
+                    if (!qFindPrefix->exec()) qDebug() << sqlQueryError(*qFindPrefix);
 
-                    QSqlQuery query(p_tempest_affix_db);
-                    query.prepare("SELECT Value FROM Prefix WHERE Name=:Name;");
-                    query.bindValue(":Name", tempest_prefix);
-                    if (!query.exec())
+                    if(qFindPrefix->next())
                     {
-                        qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
-                    }
-
-                    if(query.next())
-                    {
-                        // Get a gzipped reply from the server
-                        prefix_value = query.value(0).toInt();
+                        prefix_value = qFindPrefix->value(0).toInt();
                     }
                     else
                     {
                         prefix_value = 0;
                     }
 
-                    query.prepare("SELECT Value FROM Suffix WHERE Name=:Name;");
-                    query.bindValue(":Name", tempest_suffix);
-                    if (!query.exec())
-                    {
-                        qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
-                    }
+                    qFindSuffix->bindValue(":Name", tempest_suffix);
+                    if (!qFindSuffix->exec()) qDebug() << sqlQueryError(*qFindSuffix);
 
-                    if(query.next())
+                    if(qFindSuffix->next())
                     {
-                        // Get a gzipped reply from the server
-                        suffix_value = query.value(0).toInt();
+                        suffix_value = qFindSuffix->value(0).toInt();
                     }
                     else
                     {
@@ -106,59 +111,45 @@ void ParseReplyTask::run()
             }
         }
     }
+
+    // Commit transaction
+    p_map_db.commit();
+    p_tempest_affix_db.commit();
+
     emit mapDataChanged();
     emit finished();
 }
 
 void ParseReplyTask::upsertMap(QString map, int level, QString tempest_prefix, QString tempest_suffix, int tempest_value, int votes)
 {
-    QSqlQuery query(p_map_db);
-    query.prepare("INSERT OR REPLACE INTO Maps (Name, Level, TempestPrefix, TempestSuffix, TempestValue, Votes) "
-                  "VALUES (:Name,:Level,:TempestPrefix,:TempestSuffix,:TempestValue,:Votes);");
-    query.bindValue(":Name", map);
-    query.bindValue(":Level", level);
-    query.bindValue(":TempestPrefix", tempest_prefix);
-    query.bindValue(":TempestSuffix", tempest_suffix);
-    query.bindValue(":TempestValue", tempest_value);
-    query.bindValue(":Votes", votes);
+    qInsertMap->bindValue(":Name", map);
+    qInsertMap->bindValue(":Level", level);
+    qInsertMap->bindValue(":TempestPrefix", tempest_prefix);
+    qInsertMap->bindValue(":TempestSuffix", tempest_suffix);
+    qInsertMap->bindValue(":TempestValue", tempest_value);
+    qInsertMap->bindValue(":Votes", votes);
 
-    if (!query.exec())
-    {
-        qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
-    }
+    if (!qInsertMap->exec()) qDebug() << sqlQueryError(*qInsertMap);
 
-//    if (query.numRowsAffected() > 0) emit mapDataChanged();
 }
 
 void ParseReplyTask::upsertPrefix(QString prefix, QString description)
 {
-    QSqlQuery query(p_tempest_affix_db);
-    query.prepare("INSERT OR IGNORE INTO Prefix (Name, Value, Description) "
-                  "VALUES (:Name,(SELECT Value FROM Prefix WHERE Name=:Name),:Description);");
-    query.bindValue(":Name", prefix);
-    query.bindValue(":Description", description);
+    qInsertPrefix->bindValue(":Name", prefix);
+    qInsertPrefix->bindValue(":Description", description);
 
-    if (!query.exec())
-    {
-        qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
-    }
+    if (!qInsertPrefix->exec()) qDebug() << sqlQueryError(*qInsertPrefix);
 
-    if (query.numRowsAffected() > 0) emit tempestPrefixDataChanged();
+    if (qInsertPrefix->numRowsAffected() > 0) emit tempestPrefixDataChanged();
 }
 
 void ParseReplyTask::upsertSuffix(QString suffix, QString description)
 {
-    QSqlQuery query(p_tempest_affix_db);
-    query.prepare("INSERT OR IGNORE INTO Suffix (Name, Value, Description) "
-                  "VALUES (:Name,(SELECT Value FROM Suffix WHERE Name=:Name),:Description);");
-    query.bindValue(":Name", suffix);
-    query.bindValue(":Description", description);
+    qInsertSuffix->bindValue(":Name", suffix);
+    qInsertSuffix->bindValue(":Description", description);
 
-    if (!query.exec())
-    {
-        qDebug() << "SQL query failed ( "+query.executedQuery()+"): "+query.lastError().text();
-    }
+    if (!qInsertSuffix->exec()) qDebug() << sqlQueryError(*qInsertSuffix);
 
-    if (query.numRowsAffected() > 0) emit tempestSuffixDataChanged();
+    if (qInsertSuffix->numRowsAffected() > 0) emit tempestSuffixDataChanged();
 }
 

@@ -32,6 +32,9 @@ private:
     void upsertMap(QString map, int level, QString tempest_prefix, QString tempest_suffix, int tempest_value, int votes);
     void upsertPrefix(QString prefix, QString description);
     void upsertSuffix(QString prefix, QString description);
+
+    // Queries
+    QSqlQuery * qFindPrefix, * qFindSuffix, * qInsertMap, * qInsertPrefix, * qInsertSuffix;
 };
 
 #endif // PARSEREPLYTASK_H

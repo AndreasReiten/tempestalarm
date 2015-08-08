@@ -9,15 +9,15 @@ QVariant CustomSqlQueryModel::data ( const QModelIndex & index, int role ) const
     {
         const QVariant value(data(index.sibling(index.row(),4),Qt::DisplayRole));
 
-        int R = 510 -(255 + value.toInt()*2.5);
+        int R = 510 -(255 + value.toInt()*1.25);
         if (R > 255) R = 255;
         if (R < 0) R = 0;
 
-        int G = 255 + value.toInt()*2.5;
+        int G = 255 + value.toInt()*1.25;
         if (G > 255) G = 255;
         if (G < 0) G = 0;
 
-        int B = 255 - fabs(value.toInt()*2.5);
+        int B = 255 - fabs(value.toInt()*1.25);
         if (B > 255) B = 255;
         if (B < 0) B = 0;
 
